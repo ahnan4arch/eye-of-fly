@@ -290,7 +290,7 @@ private:
 	insock(io, ba::ip::tcp::v4() ,so), 
 	cancel(false),
 	mpool(mpool),
-	bootstrap( SCAST2BYTE_PTR(mpool.alloc_bootstrap()), nullptr, 0, mpool.boostrap_size() ),
+	bootstrap( SCAST2BYTE_PTR(mpool.alloc_bootstrap()), nullptr, 0, mpool.bootstrap_size() ),
 	state(State::InitState),
 	zqueue(STREAM_ZBUFFER_SIZE)
   {
@@ -306,7 +306,7 @@ private:
 	insock(io, ba::ip::tcp::v4() ,so), 
 	cancel(false),
 	mpool(mpool),
-	bootstrap( SCAST2BYTE_PTR(mpool.alloc_bootstrap()), nullptr, 0, mpool.boostrap_size() ),
+	bootstrap( SCAST2BYTE_PTR(mpool.alloc_bootstrap()), nullptr, 0, mpool.bootstrap_size() ),
 	state(State::InitState),
 	zqueue(STREAM_ZBUFFER_SIZE)
   {
@@ -339,7 +339,9 @@ private:
   void reading_handler_stub(const boost::system::error_code& er, size_t size );
 
   uint8_t     *bootstrap_wrk_offset();
-  State       setInitState();
+  State        setInitState();
+
+  uint8_t *const   bootstrap_begin() const;
 
   size_t      reset_bootstrap();
   size_t      update_bootstrap(uint8_t *p);
@@ -351,10 +353,11 @@ private:
   size_t      move_to_begin_bootstrap(uint8_t *buffer, const size_t left);
 
   ToReadInPtr search_jpeg_mark(const size_t size); 
-  ToReadInPtr load_jpeg(const size_t size);
-  ToReadInPtr load_jes_hdr(const size_t size) ;
+  ToReadInPtr load_jpeg       (const size_t size);
+  ToReadInPtr load_jes_hdr    (const size_t size);
 
   size_t left_in_bootstrap() const;
+  void inc_bootstrap_written(const size_t size);
   
 private:
   CameraWeakRef camera;

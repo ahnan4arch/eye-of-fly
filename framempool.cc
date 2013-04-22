@@ -6,6 +6,9 @@ using namespace vid;
 
 #define CAST2UINT(v) static_cast<unsigned>(v)
 
+
+std::shared_ptr<vid::FramePool> vid::FramePool::self;
+
 FramePool::FramePool() 
 {
   register unsigned sz = static_cast<unsigned>(ImageType::IMAGE_TYPES_NUM);
@@ -21,7 +24,7 @@ FramePool::FramePool()
 }
 
 const size_t
-FramePool::boostrap_size()  const
+FramePool::bootstrap_size()  const
 {
   return bootstrap->blockSize();
 }

@@ -46,7 +46,7 @@ public:
   void    *alloc_predef(ImageType type);
   void   release_predef(ImageType type, void *ptr);
   
-  const size_t boostrap_size() const; ///< predefined bootstrap buffer size (almost always = system page size)
+  const size_t bootstrap_size() const; ///< predefined bootstrap buffer size (almost always = system page size)
 
   void    *alloc_bootstrap();
   void   release_bootstrap(void *);
@@ -65,7 +65,6 @@ private:
 
   static std::shared_ptr<FramePool> self;
 };
-
 
 
 inline void *

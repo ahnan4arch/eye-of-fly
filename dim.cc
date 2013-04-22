@@ -15,15 +15,15 @@ namespace {
 
 using namespace vid;
 
-const size_t get_size(ImageType type) {
+const size_t vid::get_size(ImageType type) {
   return ::sizes[static_cast<unsigned>(type)];
 }
 
-const size_t get_size(unsigned type) {
+const size_t vid::get_size(unsigned type) {
   return ::sizes[static_cast<unsigned>(type)];
 }
 
 
-unsigned get_fps(Fps fps) {
+unsigned vid::get_fps(Fps fps) {
   return static_cast<unsigned>(fps);
 }

@@ -1,5 +1,8 @@
 ///
-/// @todo hide 'bs' alias in methods
+/// Changelog:
+///  - Mon Apr 22 20:38:05 MSK 2013 hide 'bs' alias in methods
+///
+/// @todo
 ///
 #include <boost/bind.hpp>
 
@@ -106,7 +109,7 @@ vid::JESStreamer::reading_handler_stub(const boost::system::error_code& er,
 	wp = load_jpeg(size);
 	break;
   default:
-	// todo: throw exception and reinit state system
+	// TODO: throw exception and reinit state system
 	dbg("unknown state while parsing incoming data: " << static_cast<unsigned>(state));
 	break;
   };
@@ -116,7 +119,6 @@ vid::JESStreamer::reading_handler_stub(const boost::system::error_code& er,
 	throw vid::exception::logic_error("internal error");
   }
 
-  //insock.async_receive(ba::buffer( std::get<field(BBufferField::RawData)>(bs) +
   async_read(insock, 
 			 // ba::buffer( std::get<field(BBufferField::RawData)>(bs) +
 			 // 			 std::get<field(BBufferField::BytesWritten)>(bs),
@@ -261,6 +263,18 @@ JESStreamer::move_to_begin_bootstrap(uint8_t *buffer, const size_t left)
   return std::get<field(BBufferField::Size)>(bootstrap) - left;
 }
 
+inline uint8_t *const
+JESStreamer::bootstrap_begin() const 
+{
+  return std::get<field(BBufferField::RawData)>(bootstrap);
+}
+
+inline void 
+JESStreamer::inc_bootstrap_written(const size_t size)
+{
+  std::get<field(BBufferField::BytesWritten)>(bootstrap) += size;
+}
+
 
 JESStreamer::ToReadInPtr 
 JESStreamer::search_jpeg_mark(const size_t size) 
@@ -357,7 +371,7 @@ JESStreamer::search_jpeg_mark(const size_t size)
 
   // update bytes written. it shouldn't overflows, because asio::buffer interface 
   // should insure requests in async operation bounds
-  get<field(BBufferField::BytesWritten)>(bs) += size;
+  inc_bootstrap_written(size);
 
   size_t to_write = left_in_bootstrap();
 
@@ -403,7 +417,7 @@ JESStreamer::load_jes_hdr(const size_t size)
 	  // no place in bootstrap to get whole header, move part to
 	  // the start of bootstrap and init header pointer
 	  size_t to_write = move_to_begin_bootstrap(buffer, left);
-	  set_hdr_pointer( get<field(BBufferField::RawData)>(bs));
+	  set_hdr_pointer(  bootstrap_begin() );
 
 	  return make_pair( bootstrap_wrk_offset(), to_write);
 	} else {
@@ -436,9 +450,8 @@ JESStreamer::load_jes_hdr(const size_t size)
 	  size_t to_write = move_to_begin_bootstrap(get_hdr_pointer(), 
 												buffer + left - get_hdr_pointer());
 
-	  set_hdr_pointer( get<field(BBufferField::RawData)>(bs));
+	  set_hdr_pointer( bootstrap_begin() );
 	  return make_pair( bootstrap_wrk_offset(), to_write);
-
 	}
 
 	break;

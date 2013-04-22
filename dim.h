@@ -52,7 +52,8 @@ namespace vid {
   /// Help functions
   const size_t   get_size(ImageType type);
   const size_t   get_size(unsigned type);
-  unsigned        get_fps(Fps fps);
+
+  unsigned       get_fps(Fps fps);
 }
 
 

@@ -52,7 +52,7 @@ public:
   void   release_bootstrap(void *);
 
   static FramePoolSPtr global_pool() {
-	return (self) ? self : (self.reset( new FramePool), self);
+	return (self) ? self : (self.reset( new FramePool ), self);
   }
 
   ///< @todo alloc and release custom frames

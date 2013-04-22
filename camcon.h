@@ -56,7 +56,7 @@ public:
 
   int get_channel(const std::string &url, const std::string &cmd, uint16 port=HTTPSession::HTTP_PORT) {
 
-	session         = std::make_shared<HTTPClientSession>(url, port);
+	session         = std::make_shared(url, port);
 	HTTPRequest       req(HTTPRequest::HTTP_GET, cmd, HTTPMessage::HTTP_1_1);
 	HTTPResponse      resp;
 	

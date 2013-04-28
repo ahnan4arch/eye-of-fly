@@ -1,8 +1,19 @@
+#include <iostream>
+
+#include <Poco/ConsoleChannel.h>
+#include <Poco/Exception.h>
+#include <Poco/Logger.h>
+
 #include <boost/format.hpp>
 
 #include "cam.h"
 #include "camcon.h"
 #include "framempool.h"
+
+
+using Poco::ConsoleChannel;
+using Poco::Logger;
+using Poco::Exception;
 
 using namespace vid;
 using namespace std;
@@ -51,7 +62,14 @@ Camera::add_streamer(vid::Dispatcher &d, const std::string &name, const VideoMod
   CamConnection c(url, 
 					 prepare_get_cmd(vmode, name, id), 
 					 port);
-  int sock   =  c.connect();
+
+  int sock = NILL_SOCKET;
+
+  try {
+	sock = c.connect();
+  } catch(Poco::Exception &e) {
+	Logger::get("dbg-connect").log(e);
+  }
 
   if (NILL_SOCKET == sock) {
 	throw vid::exception::init_error("can't make a connection to device");
@@ -60,8 +78,13 @@ Camera::add_streamer(vid::Dispatcher &d, const std::string &name, const VideoMod
   //
   // 2. Create streamer object
   //
-  JESStreamer::pointer s = JESStreamer::make_streamer(shared_from_this(), 
+  JESStreamer::pointer s = JESStreamer::make_streamer( shared_from_this(), 
 													   d.service(), *ppool, sock );
+
+  // Store socket object in streamer, in not to do this
+  // it will be deleted with CamConnection ('c' in our case) variable.
+  s->store_sock_holder( c.get_so());
+
   if (!s) { //report an error
 	close(sock);
 	throw vid::exception::init_error("failed to create streamer");

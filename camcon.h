@@ -1,26 +1,13 @@
 #ifndef _CAMCOM_INC
 #define _CAMCOM_INC
 
-#include "Poco/Format.h"
-
-#include "Poco/Net/HTTPClientSession.h"
-#include "Poco/Net/HTTPMessage.h"
-#include "Poco/Net/HTTPRequest.h"
-#include "Poco/Net/HTTPResponse.h"
-#include "Poco/Net/SocketStream.h"
-
 #include <memory>
 #include <stdexcept>
+#include <cstdint>
+
+#include "config.h"
 
 #define NILL_SOCKET -1
-
-using Poco::format;
-
-using Poco::Net::HTTPClientSession;
-using Poco::Net::HTTPRequest;
-using Poco::Net::HTTPResponse;
-using Poco::Net::HTTPMessage;
-using Poco::Net::HTTPSession;
 
 namespace vid {
   class DeviceConnection;
@@ -39,32 +26,25 @@ class vid::CamConnection {
   int conn_so;
   unsigned short port;
 
-  std::shared_ptr<HTTPClientSession> session;
-public: // ctor/dtor section
+  //std::shared_ptr<HTTPClientSession> session;
+  typedef std::shared_ptr<void> VoidConnSPtr;
 
-  typedef Poco::UInt16 uint16;
+  VoidConnSPtr vsp_so;
+public: // ctor/dtor section
 
   CamConnection(const std::string &url_, 
 			   const std::string &cmd_, 
-			   uint16 port=HTTPSession::HTTP_PORT) : 
+			   unsigned port=DEFAULT_HTTP_PORT) : 
    url(url_), 
    cmd(cmd_),
    conn_so(NILL_SOCKET),
    port(port) {}
 
+private:
+  int get_channel(const std::string &url, 
+				  const std::string &cmd, 
+				  unsigned short port=DEFAULT_HTTP_PORT);
 public:
-
-  int get_channel(const std::string &url, const std::string &cmd, uint16 port=HTTPSession::HTTP_PORT) {
-
-	session         = std::make_shared(url, port);
-	HTTPRequest       req(HTTPRequest::HTTP_GET, cmd, HTTPMessage::HTTP_1_1);
-	HTTPResponse      resp;
-	
-	session->sendRequest(req);
-	session->receiveResponse(resp);
-
-	return conn_so = session->detachSocket().impl()->sockfd();
-  }
 
   int connect() {
 	if (url.empty()) {
@@ -78,16 +58,23 @@ public:
 	return get_channel(url, cmd, port);
   }
 
+  VoidConnSPtr connect_ref() {
+	int so = connect();
+	return vsp_so;
+  }
+
   void close() {
-	if (session) {
-	  session->reset();
-	}
+	// if (session) {
+	//   session->reset();
+	// }
   }
 
 public:
 
   void setCommand(const std::string &cmd_) { cmd = cmd_; }
   void setURL(const std::string &url_)     { url = url_; }
+
+  VoidConnSPtr get_so() const { return vsp_so; }
 
 };
 

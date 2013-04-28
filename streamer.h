@@ -226,6 +226,9 @@ public:
   virtual void close() = 0;
 
   //  virtual void bint_to_stream(ba::io_service &io) = 0;
+  
+  typedef std::shared_ptr<void> ISockSPtr;
+  virtual void store_sock_holder(ISockSPtr) = 0;
 
   virtual ~Streamer() {}
 };
@@ -269,6 +272,7 @@ private:
   };
 
 public:
+
   typedef std::shared_ptr<Streamer> pointer;
 
   static pointer make_streamer(ba::io_service &io, 
@@ -278,7 +282,6 @@ public:
   static pointer make_streamer(CameraSPtr, ba::io_service &io, 
 			  FramePool &mpool,
 			  const ba::ip::tcp::socket::native_handle_type &so);
-
 
 private:
 
@@ -335,6 +338,9 @@ public:
   virtual ba::io_service &get_io_service() { return insock.get_io_service(); }
 
   virtual void close();
+
+  virtual void store_sock_holder(ISockSPtr);
+
 private:
   void reading_handler_stub(const boost::system::error_code& er, size_t size );
 
@@ -358,12 +364,19 @@ private:
 
   size_t left_in_bootstrap() const;
   void inc_bootstrap_written(const size_t size);
-  
+ 
+ 
 private:
   CameraWeakRef camera;
 
   ba::strand strand;
   ba::ip::tcp::socket insock;
+
+
+  ISockSPtr pso; 
+  ///<  stored here for keeping counter above zero, to not to delete it 
+  ///<  occasionally in another parts of code
+  
   bool cancel;
 
   FramePool &mpool;

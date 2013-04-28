@@ -13,7 +13,11 @@
 
 
 // Note: tempory placeholeder!
-#define dbg(m) std::cerr << __func__ << " " <<  m << std::endl
+#if 1
+#define dbg(m) std::cerr << __func__ << ": " <<  m << std::endl
+#else 
+#define dbg(m)
+#endif
 
 
 namespace ba = boost::asio;
@@ -58,10 +62,15 @@ vid::JESStreamer::start_reading()
   size_t size;
   std::tie(data, std::ignore, std::ignore, size) = bootstrap;
 
+  size = 16;
+  dbg("Start reading " << size << " bytes");
+
   insock.async_receive(ba::buffer( data, size), 
-					   strand.wrap(boost::bind(&JESStreamer::reading_handler_stub,this,   
-											   ba::placeholders::error,
-											   ba::placeholders::bytes_transferred)));
+  					   strand.wrap(boost::bind(&JESStreamer::reading_handler_stub, 
+  											   //shared_from_this(),
+  											   this,   
+  											   ba::placeholders::error,
+  											   ba::placeholders::bytes_transferred)));
 }
 
 void
@@ -88,6 +97,7 @@ vid::JESStreamer::reading_handler_stub(const boost::system::error_code& er,
 	  dbg("reading cancel: " << er);
 	}
 
+	dbg("unknown error");
 	return;
   }
 
@@ -148,6 +158,13 @@ JESStreamer::make_streamer(CameraSPtr parent, ba::io_service &io,
   JESStreamer *js = new JESStreamer(parent, io, mpool, so);
   return pointer( dynamic_cast<Streamer*>(js) );
 }
+
+void 
+JESStreamer::store_sock_holder(ISockSPtr so)
+{
+  this->pso = so;
+}
+
 
 void
 JESStreamer::set_camera(CameraSPtr parent) 

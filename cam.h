@@ -39,7 +39,7 @@ namespace vid {
 class vid::Camera :
   public std::enable_shared_from_this<Camera> {
 
-public:
+protected:
   
   Camera(const std::string &url, 
 		 const std::string &idname, 
@@ -101,7 +101,7 @@ private:
 };
 
 class vid::NVCamera : public vid::Camera {
-public:
+protected:
 
   NVCamera(const std::string &url, 
 		   const std::string &idname, 
@@ -113,6 +113,14 @@ protected:
   virtual std::string prepare_get_cmd(const VideoMode &, const std::string &name, int id);
 private:
   const static std::string get_cmd_args_format;
+
+public:
+  static CameraSPtr make(const std::string &url, 
+				  const std::string &idname, 
+				  const std::string &desc="",
+				  unsigned short port=DEFAULT_HTTP_PORT) {
+	return CameraSPtr(new NVCamera(url, idname, desc, port));
+  }
 };
 
 

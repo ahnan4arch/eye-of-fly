@@ -8,6 +8,7 @@
 
 #include <atomic>
 #include <memory>
+#include <utility>
 
 #include "Poco/MemoryPool.h"
 
@@ -16,6 +17,7 @@
 
 namespace vid {
   class FramePool;
+  typedef std::pair<unsigned, void*> WorkingSlab;
 }
 
 using Poco::MemoryPool;
@@ -42,6 +44,10 @@ public:
   };
 
 public:
+
+  WorkingSlab alloc_wrk(size_t size);
+  void release_wrk(WorkingSlab &wrk);
+  
  
   void    *alloc_predef(ImageType type);
   void   release_predef(ImageType type, void *ptr);

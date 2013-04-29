@@ -48,3 +48,20 @@ FramePool::release_predef(ImageType type, void *ptr)
 {
   predefined[CAST2UINT(type)]->release(ptr);
 }
+
+
+WorkingSlab
+FramePool::alloc_wrk(size_t size)
+{
+  unsigned index = 100;
+  void *p        = nullptr;
+
+  return std::make_pair(index, p);
+}
+
+
+void
+FramePool::release_wrk(WorkingSlab &victim)
+{
+  
+}

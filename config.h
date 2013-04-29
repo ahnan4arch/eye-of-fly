@@ -36,9 +36,11 @@ enum MaxStreamCount : unsigned {
 #define JESMARK1 0xFF
 #define JESMARK2 0xFE
 
+#define JES_MARKS_NUM 4
+
 #define JES_HEADER_SIZE 60 /* bytes */
 
 /// @brief without leading marks (4 bytes)
-#define JES_HDR_SIZE_OFFSET 44 /* bytes */
+#define JES_HDR_SIZE_OFFSET 48 /* bytes */
 
 #endif

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8)
 
 project(EyeOfFly)
 
-add_definitions( -DBOOST_ASIO_ENABLE_HANDLER_TRACKING )
+# add_definitions( -DBOOST_ASIO_ENABLE_HANDLER_TRACKING -DDEBUG )
 
 add_executable(EyeOfFly fly.cc cam.cc dim.cc disp.cc framempool.cc streamer.cc camcon)
 
@@ -23,7 +23,7 @@ else()
 endif()
 
 set( USE_CXX11      "-std=c++0x -Wfatal-errors"       )
-set( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${USE_CXX11} -flto" )
+set( CMAKE_CXX_FLAGS  "-g ${CMAKE_CXX_FLAGS} ${USE_CXX11} -flto" )
 
 #include_directories(${PROJECT_SOURCE_DIR}/../lib)
 

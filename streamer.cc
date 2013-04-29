@@ -8,9 +8,15 @@
 
 #include "streamer.h"
 
+#include <Poco/Logger.h>
+#include <Poco/Message.h>
+
+
 #define  TO_BYTE(b)   static_cast<uint8_t  >(b)
 #define  TO_PBYTE(b)  static_cast<uint8_t *>(b)
 
+using Poco::Logger;
+using Poco::Message;
 
 // Note: tempory placeholeder!
 #if 1
@@ -62,7 +68,7 @@ vid::JESStreamer::start_reading()
   size_t size;
   std::tie(data, std::ignore, std::ignore, size) = bootstrap;
 
-  size = 16;
+  //size = 16;
   dbg("Start reading " << size << " bytes");
 
   insock.async_receive(ba::buffer( data, size), 
@@ -101,7 +107,10 @@ vid::JESStreamer::reading_handler_stub(const boost::system::error_code& er,
 	return;
   }
 
+
   ToReadInPtr wp = std::make_pair(nullptr,0);
+
+  // dbg("Choosing state");
 
   switch(state) {
   case State::InitState:
@@ -129,13 +138,16 @@ vid::JESStreamer::reading_handler_stub(const boost::system::error_code& er,
 	throw vid::exception::logic_error("internal error");
   }
 
+  dbg("Reading async...");
   async_read(insock, 
 			 // ba::buffer( std::get<field(BBufferField::RawData)>(bs) +
 			 // 			 std::get<field(BBufferField::BytesWritten)>(bs),
 			 // 			 to_write ),
 			 ba::buffer( wp.first, wp.second),
 			 ba::transfer_at_least(IO_CHUNK),
-			 strand.wrap(boost::bind(&JESStreamer::reading_handler_stub, shared_from_this(),   
+			 strand.wrap(boost::bind(&JESStreamer::reading_handler_stub, 
+									 this,
+									 //shared_from_this(),    ///< @todo why not working!?
 									 ba::placeholders::error,
 									 ba::placeholders::bytes_transferred)));
 }
@@ -199,7 +211,7 @@ JESStreamer::close()
 inline void
 JESStreamer::set_hdr_pointer(uint8_t *hdr)
 {
-  std::get<field(BBufferField::JESHeader)>(bootstrap) = hdr ? 
+  std::get<field(BBufferField::JESHeader)>(bootstrap) = (nullptr != hdr) ? 
 	hdr :
 	std::get<field(BBufferField::RawData)>(bootstrap);
 }
@@ -214,18 +226,37 @@ inline void
 JESStreamer::parse_jes_hdr() 
 {
   jes_hdr.clear();
- 
+  
+  assert( get_hdr_pointer() );
+
+  // dbg("header ptr => " << (void *) get_hdr_pointer() );
+
+  // Logger &d = Logger::get("dbg-connect");
+  // d.dump("JES Header", get_hdr_pointer(), JES_HEADER_SIZE,
+  // 		 Message::PRIO_ERROR );
+
   BinaryParser hdr(get_hdr_pointer(), JES_HEADER_SIZE);
+
+  // dbg("data  ptr => " << (void *) hdr.data() );
+  // dbg("where ptr => " << (void *) hdr.offset() );
+  // dbg("jes size prior  => " << jes_hdr.size );
 
   hdr >> skip(JES_HDR_SIZE_OFFSET) >> jes_hdr.size;
 
-  dbg("ready to read frame with size: " << jes_hdr.size);
+  // dbg("jes size after  => " << std::dec << jes_hdr.size );
+  // d.dump("Length part", hdr.offset()-4, sizeof(jes_hdr.size) ,
+  // 		 Message::PRIO_ERROR );
+
+
+  dbg("ready to read frame with size: " << std::dec << jes_hdr.size);
 }
 
 JESStreamer::State
 JESStreamer::setInitState() 
 {
   BootstrapBuffer &bs = bootstrap;
+
+  // dbg("state init: " << (unsigned) state <<  " => " << 0 );
 
   state = State::InitState;
   std::get<field(BBufferField::JESHeader)>(bs) = nullptr;
@@ -250,11 +281,14 @@ inline size_t
 JESStreamer::update_bootstrap(uint8_t *p) 
 {
   ptrdiff_t    diff = p - std::get<field(BBufferField::RawData)>(bootstrap);
-  const size_t size =     std::get<field(BBufferField::BytesWritten)>(bootstrap);
 
-  if (diff > size ) {
-	diff = static_cast<ptrdiff_t>(size);
-  }
+  assert(diff <= std::get<field(BBufferField::Size)>(bootstrap) );
+
+  // const size_t size =     std::get<field(BBufferField::Size)>(bootstrap);
+
+  // if (diff > size ) {
+  // 	diff = static_cast<ptrdiff_t>(size);
+  // }
 
   std::get<field(BBufferField::BytesWritten)>(bootstrap) = static_cast<size_t>(diff);
 
@@ -292,6 +326,14 @@ JESStreamer::inc_bootstrap_written(const size_t size)
   std::get<field(BBufferField::BytesWritten)>(bootstrap) += size;
 }
 
+inline void 
+JESStreamer::set_state(State new_state)
+{
+  // dbg("state transition: " << (unsigned) state <<  " => " << (unsigned) new_state); 
+
+  state = new_state;
+}
+
 
 JESStreamer::ToReadInPtr 
 JESStreamer::search_jpeg_mark(const size_t size) 
@@ -312,17 +354,28 @@ JESStreamer::search_jpeg_mark(const size_t size)
   // 
   while(buffer < wrkwin + size) { // inside working window
 
+	// dbg("State " << (unsigned) state);
+	// dbg("window   size " << std::dec << (buffer - wrkwin) );
+	// dbg("recieved size " << std::dec << size );
+	// dbg("left     size " << std::dec << left );
+
 	if (state == State::InitState) {
 	  while(uint8_t *pm1 = TO_PBYTE(memchr(buffer, JPEGMARK1, left))) {
 		if (pm1 < buffer + left - 1) { // some data left in buffer, check for second mark
 		  
 		  if (pm1[1] == TO_BYTE(JPEGMARK2)) { // found second mark
-			state   = State::ReadJPEGSecondMarkState;
+			set_state(State::ReadJPEGSecondMarkState);
 
 			// adjust working window size
 			// replace working buffer pointer
 			left   -= pm1 + 2 - buffer;
 			buffer  = pm1 + 2;     
+			
+			// dbg("left " << left);
+			// dbg("pb1  " << hex << (unsigned) pm1[0] );
+			// dbg("pb2  " << hex << (unsigned) pm1[1] );
+			// dbg("pb3  " << hex << (unsigned) pm1[2] );
+			// dbg("pb4  " << hex << (unsigned) pm1[3] );
 
 			// jpeg mark was read we have done here, proceed to next iteration
 			break;
@@ -339,11 +392,21 @@ JESStreamer::search_jpeg_mark(const size_t size)
 		} else {
 		  // no more data in buffer to check, 
 		  // try on next round
-		  state   = State::ReadJPEGFirstMarkState;
+		  set_state(State::ReadJPEGFirstMarkState);
+
 		  buffer += left; // just for logical consistency, not really needed
 		  left    = 0;
 		}
 	  } // while getting first jpeg mark in frame window 	  
+
+	  // No mark found in data, skip to next read iteration
+	  // if state is 'init'
+	  if (state == State::InitState) {
+		buffer += left;
+	    left    = 0;
+		break;
+	  }
+
 	} // state == InitState
 
 	if (state == State::ReadJPEGFirstMarkState && left) {
@@ -357,7 +420,13 @@ JESStreamer::search_jpeg_mark(const size_t size)
 	}
 
 	if (state == State::ReadJPEGSecondMarkState && left) {
-	  
+
+	  // dbg("byte0 => " << hex << (unsigned) buffer[-2]);
+	  // dbg("byte1 => " << hex << (unsigned) buffer[-1]);
+	  // dbg("byte2*=> " << hex << (unsigned) buffer[ 0]);
+	  // dbg("byte3 => " << hex << (unsigned) buffer[ 1]);
+	  // dbg("byte4 => " << hex << (unsigned) buffer[ 2]);
+
 	  state = buffer[0] == TO_BYTE(JESMARK1) ? 
 		State::ReadJESFirstMarkState :
 		setInitState();
@@ -375,12 +444,33 @@ JESStreamer::search_jpeg_mark(const size_t size)
 
 	  buffer++;
 	  left--;
+
+	  // if (state == State::ReadJESSecondMarkState ) {
+	  // 	set_hdr_pointer(buffer);
+	  // }
 	}
 
 
 	if (state == State::ReadJESSecondMarkState && left) {
 	  // 'left' enough bytes in buffer for jes header
+
+	  // dbg("loading jes header, left => " << dec << left);
+	  // dbg("byte0 => " << hex << (unsigned) buffer[-4]);
+	  // dbg("byte1 => " << hex << (unsigned) buffer[-3]);
+	  // dbg("byte2 => " << hex << (unsigned) buffer[-2]);
+	  // dbg("byte3 => " << hex << (unsigned) buffer[-1]);
+	  // dbg("byte4*=> " << hex << (unsigned) buffer[ 0]);
+	  // dbg("byte5 => " << hex << (unsigned) buffer[ 1]);
+	  // dbg("byte6 => " << hex << (unsigned) buffer[ 2]);
+	  // dbg("byte7 => " << hex << (unsigned) buffer[ 2]);
+
+	  // dbg("buffer offset start   => " << (buffer - bootstrap_begin()));
+	  // dbg("buffer offset working => " << (buffer - bootstrap_wrk_offset()));
+
 	  update_bootstrap(buffer);
+
+	  // dbg("buffer offset after => " <<  (buffer - bootstrap_wrk_offset()));
+
 	  return load_jes_hdr(left);
 	}
 
@@ -409,7 +499,7 @@ JESStreamer::load_jes_hdr(const size_t size)
 
   assert(size);
 
-  BootstrapBuffer &bs = bootstrap;
+  //BootstrapBuffer &bs = bootstrap;
 
   uint8_t *buffer        = bootstrap_wrk_offset();
   uint8_t * const wrkwin = buffer;
@@ -417,15 +507,22 @@ JESStreamer::load_jes_hdr(const size_t size)
 
   switch(state) {
   case State::ReadJESSecondMarkState: 
-	// start to read jes header and we have place for whole header
 
-	state = State::ReadJESHeaderState;
+	set_state(State::ReadJESHeaderState);
+
+	//set_hdr_pointer(buffer);
 	
-	// all marks are checked at this point, we have a jpeg with jes
-	// chain to header parser
+	// all marks are checked at this point, we have a jpeg with jes;
+	// chain it to header parser
 
-	if (left >= JES_HEADER_SIZE) {
-	  state = State::GetJESHeaderState;
+	if (left >= JES_HEADER_SIZE) { // - JES_MARKS_NUM
+	  // start to read jes header and we have place for whole header
+
+	  set_state(State::GetJESHeaderState);
+
+	  // current position - 4 byte marks (2 JPEG + 2 JES)
+	  set_hdr_pointer(buffer-JES_MARKS_NUM);
+
 	  // 'left' enough bytes in buffer for jes header
 	  return load_jpeg(left);
 
@@ -442,7 +539,6 @@ JESStreamer::load_jes_hdr(const size_t size)
 	  // but haven't enough bytes yet,
 	  // just got to next read iteration in this state
 
-	  set_hdr_pointer(buffer);
 	  update_bootstrap(buffer + left);
 
 	  return make_pair(bootstrap_wrk_offset(),
@@ -454,7 +550,7 @@ JESStreamer::load_jes_hdr(const size_t size)
 	// Note: fresh hdr pointer should be set at this point.
 	// consider a bug otherwise
 	if (buffer + left >= get_hdr_pointer() + JES_HEADER_SIZE) { // get it
-	  state = State::GetJESHeaderState;
+	  set_state(State::GetJESHeaderState);
 	  return load_jpeg(left);
 	} else if (left_in_bootstrap() >= JES_HEADER_SIZE + BS_BUFFER_LOW_WATERMARK) { 
 	  // need to continue on next iteration

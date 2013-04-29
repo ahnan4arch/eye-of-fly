@@ -34,6 +34,7 @@ Dispatcher::run(bool should_join)
   generate_n(back_inserter(thrs), ncores,
   		   [&, this] () 
   		   { 
+			 poco_warning(dlog, "Starting thread...");
   			 return ThreadSPtr( new thread(std::bind( static_cast<IORunMethodPtr>(&ba::io_service::run), &this->io) ) ); 
   			   } 
   		   );

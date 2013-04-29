@@ -14,6 +14,8 @@
 #include <cassert>
 #include <cstdint>
 
+#include <endian.h>
+
 #include <boost/asio.hpp>
 #include <boost/circular_buffer.hpp>
 //#include <boost/enable_shared_from_this.hpp>
@@ -26,9 +28,11 @@
 
 #define SCAST2BYTE_PTR(bp) static_cast<uint8_t*>(bp)
 
-#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-#define CONV_FROM_BE16(v) __buildin_bswap16(v)
-#define CONV_FROM_BE32(v) __buildin_bswap32(v)
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__       
+// #define CONV_FROM_BE16(v) __builtin_bswap16(v)
+// #define CONV_FROM_BE32(v) __builtin_bswap32(v)
+#define CONV_FROM_BE16(v) htobe16(v)
+#define CONV_FROM_BE32(v) htobe32(v)
 #else 
 #define CONV_FROM_BE16(v) v
 #define CONV_FROM_BE32(v) v
@@ -142,15 +146,35 @@ public:
   
   inline BinaryParser &skip(const size_t &skip);
 
-  uint8_t   byte_placeholder;
-  uint16_t short_placeholder;
-  uint32_t  word_placeholder;
+  typedef uint8_t   byte_placeholder;
+  typedef uint16_t short_placeholder;
+  typedef uint32_t  word_placeholder;
+  
+  uint8_t *offset() const {
+	return where;
+  }
+
+  uint8_t *data() const {
+	return buffer;
+  }
+
 };
 
+
+#include <iostream>
+#include <iomanip>
 
 template<class T>
 void vid::cast2val(uint8_t *ptr, T &v) {
   v = *reinterpret_cast<T *>(ptr);
+
+  // using namespace std;
+  // std::cerr << "byte 0 " << hex << (int) *ptr << endl;
+  // std::cerr << "byte 1 " << hex << (int)*(ptr + 1) << endl;
+  // std::cerr << "byte 2 " << hex << (int)*(ptr + 2) << endl;
+  // std::cerr << "byte 3 " << hex << (int)*(ptr + 3) << endl;
+
+  // std::cerr << "Value "  << (int)  *reinterpret_cast<T *>(ptr) << std::endl;
 }
 
 inline
@@ -159,7 +183,7 @@ vid::BinaryParser::operator>>(uint8_t  &v)
 {
   assert(len - (where - buffer) >= sizeof(uint8_t)); 
 
-  cast2val(buffer, v);
+  cast2val(where, v);
   where += sizeof(uint8_t);
 }
 
@@ -169,11 +193,14 @@ vid::BinaryParser::operator>>(uint16_t  &v)
 {
   assert(len - (where - buffer) >= sizeof(uint16_t)); 
 
-  cast2val(buffer, v);
+  cast2val(where, v);
+  v = CONV_FROM_BE16(v);
+
   //  v = cast2val(buffer);
   //  v = *rintrepret_cast<uint16_t *>(buffer);
   where += sizeof(uint16_t);
 }
+
 
 inline
 vid::BinaryParser &
@@ -181,9 +208,9 @@ vid::BinaryParser::operator>>(uint32_t  &v)
 {
   assert(len - (where - buffer) >= sizeof(uint32_t)); 
 
-  cast2val(buffer, v);
-  //  v = cast2val(buffer);
-  //  v = *rintrepret_cast<uint32_t *>(buffer);
+  cast2val(where, v);
+  v = CONV_FROM_BE32(v);
+
   where += sizeof(uint32_t);
 }
 
@@ -352,7 +379,7 @@ private:
   size_t      reset_bootstrap();
   size_t      update_bootstrap(uint8_t *p);
 
-  void        set_hdr_pointer(uint8_t *hdr);
+  void        set_hdr_pointer(uint8_t *hdr=nullptr);
   uint8_t    *get_hdr_pointer();
   void        parse_jes_hdr();
 
@@ -365,7 +392,7 @@ private:
   size_t left_in_bootstrap() const;
   void inc_bootstrap_written(const size_t size);
  
- 
+  void set_state(State);
 private:
   CameraWeakRef camera;
 

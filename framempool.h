@@ -16,11 +16,54 @@
 #include "exception.h"
 
 namespace vid {
+  class WorkingPool;
   class FramePool;
-  typedef std::pair<unsigned, void*> WorkingSlab;
+
+  typedef std::shared_ptr<Poco::MemoryPool> MemPoolSPtr;
+  typedef std::shared_ptr<WorkingPool>      WrkPoolSptr;
+
+  bool operator<(const WrkPoolSptr &lh, const WrkPoolSptr &rh);
 }
 
 using Poco::MemoryPool;
+
+///
+/// @class WorkingPool
+///
+/// @brief Record for 'working buffers' table, used to allocate buffers for recieved compressed 
+///        image.
+///
+class vid::WorkingPool {
+public:
+  WorkingPool(const unsigned pg_num, 
+			  const unsigned pg_size=DEFAULT_PAGE_SIZE, 
+			  const unsigned allocate=MAX_CAMS_CONFIG * (STREAM_ZBUFFER_SIZE + 1)) :
+	pg_num(pg_num),
+	requests(0),
+	used(0),
+	allocated(allocate),
+	pool(std::make_shared<MemoryPool>(pg_num * pg_size, allocate, allocate) )
+  {}
+
+  friend bool operator<(const WrkPoolSptr &lh, const WrkPoolSptr &rh);
+public:
+
+  void *alloc();
+  void release(void *p);
+
+  const unsigned pg_number() const { return pg_num; }
+private:
+  const unsigned pg_num;
+
+  // Statistics
+  ///< @todo make allocation more robust based on stat
+  std::atomic<unsigned long long> requests;
+  std::atomic<unsigned long     > used;
+  std::atomic<unsigned long     > allocated;
+
+  MemPoolSPtr pool;
+};
+
 
 ///
 /// @class FramePool
@@ -28,14 +71,15 @@ using Poco::MemoryPool;
 ///
 class vid::FramePool {
 
-
-  typedef std::shared_ptr<Poco::MemoryPool> MemPoolSPtr;
-
+  typedef std::vector<WrkPoolSptr> WorkingPoolsVec;
   std::vector<MemPoolSPtr> predefined;
 
   MemPoolSPtr bootstrap;
+  WorkingPoolsVec wrk_pools;
 public:
   typedef std::shared_ptr<FramePool> FramePoolSPtr;
+
+  typedef std::pair<unsigned, void*> WorkingSlab;
   
   /// most field (if not mentioned) are in bytes
   struct Stat {
@@ -46,9 +90,8 @@ public:
 public:
 
   WorkingSlab alloc_wrk(size_t size);
-  void release_wrk(WorkingSlab &wrk);
-  
- 
+  void release_wrk(const WorkingSlab &wrk);
+   
   void    *alloc_predef(ImageType type);
   void   release_predef(ImageType type, void *ptr);
   
@@ -61,7 +104,8 @@ public:
 	return (self) ? self : (self.reset( new FramePool ), self);
   }
 
-  ///< @todo alloc and release custom frames
+  unsigned long wrk_pool_idx(const size_t size) const;
+
 private:
 
   FramePool();
@@ -69,7 +113,16 @@ private:
   FramePool(const FramePool &other) = delete;
   FramePool &operator=(const FramePool &other) = delete;
 
+private:
+
+  void init_page_size();
+  unsigned long pages_num(const size_t size) const;
+
+private:
+
   static std::shared_ptr<FramePool> self;
+
+  long sys_page_size; ///< System page size. Should be const
 };
 
 

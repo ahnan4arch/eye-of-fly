@@ -59,7 +59,8 @@ public:
   }
 
   VoidConnSPtr connect_ref() {
-	int so = connect();
+	// int so = 
+	  connect();
 	return vsp_so;
   }
 

@@ -9,6 +9,8 @@ namespace vid {
 	class not_implemented;
 	class logic_error;
 	class init_error;
+	class nomem_error;
+	class out_of_range_error;
   }
 }
 
@@ -25,6 +27,16 @@ public:
 class vid::exception::init_error : public std::runtime_error {
 public:
   init_error(const std::string &what=" initializer error ") : std::runtime_error(what) {}
+};
+
+class vid::exception::nomem_error : public std::runtime_error {
+public:
+  nomem_error(const std::string &what=" not enough memory ") : std::runtime_error(what) {}
+};
+
+class vid::exception::out_of_range_error : public std::runtime_error {
+public:
+  out_of_range_error(const std::string &what=" not in range ") : std::runtime_error(what) {}
 };
 
 

@@ -43,4 +43,6 @@ enum MaxStreamCount : unsigned {
 /// @brief without leading marks (4 bytes)
 #define JES_HDR_SIZE_OFFSET 48 /* bytes */
 
+#define DEFAULT_PAGE_SIZE 4096
+
 #endif

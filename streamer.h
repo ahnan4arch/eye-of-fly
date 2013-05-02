@@ -9,6 +9,7 @@
 #include <atomic>
 #include <memory>
 #include <tuple>
+#include <thread>
 #include <type_traits>
 
 #include <cassert>
@@ -25,6 +26,9 @@
 #include "config.h"
 //#include "cam.h"
 #include "framempool.h"
+#include "dim.h"
+#include "jpegd.h"
+
 
 #define SCAST2BYTE_PTR(bp) static_cast<uint8_t*>(bp)
 
@@ -42,20 +46,33 @@
 // Note: forward declarations, inlcudes may follow
 // TODO: rewrite it
 namespace vid {
+
   enum class FrameField : unsigned {
-	RawData,
-	Where,
 	ImageData,
-	ImageBytes,
+	Size,
 	ImageType
   };
 
-  typedef std::tuple<std::uint8_t *, ///< Incoming packet data of JPEG image
-					 std::uint8_t *, ///< Where to write next byte
-					 std::uint8_t *, ///< Processed frame in memory
-					 size_t,          ///< Size of processed frame
+  typedef std::shared_ptr<uint8_t> FrameRawSPtr;
+
+  typedef std::tuple<FrameRawSPtr,   ///< Processed frame in memory
+					 size_t,         ///< Size of processed frame
 					 ImageType
 					 > Frame;
+
+  class FrameDeleter;
+
+
+  enum class WBField : unsigned {
+	SlabInfo,
+	Offset,  
+    Size
+  };
+
+  typedef std::tuple<FramePool::WorkingSlab,    ///< pointer to start is a second elementh
+					 size_t,         ///< offset, where to put data
+					 size_t          ///< total incoming jpeg size (+jes header)
+					 > WrkBuffer;
 
   class Streamer;
   class JESStreamer;
@@ -123,6 +140,20 @@ namespace vid {
 }
 
 
+
+class vid::FrameDeleter {
+  FramePool &pool;
+  ImageType type;
+public:
+  FrameDeleter(FramePool &pool, ImageType type) : pool(pool),
+												  type(type) {}
+  void operator()(std::uint8_t *p) {
+	pool.release_predef(type, p);
+  }
+};
+
+
+
 class vid::BinaryParser {
 
   uint8_t *buffer, *where;
@@ -185,6 +216,8 @@ vid::BinaryParser::operator>>(uint8_t  &v)
 
   cast2val(where, v);
   where += sizeof(uint8_t);
+
+  return const_cast<BinaryParser&>(*this);
 }
 
 inline
@@ -199,6 +232,8 @@ vid::BinaryParser::operator>>(uint16_t  &v)
   //  v = cast2val(buffer);
   //  v = *rintrepret_cast<uint16_t *>(buffer);
   where += sizeof(uint16_t);
+
+  return const_cast<BinaryParser&>(*this);
 }
 
 
@@ -212,6 +247,8 @@ vid::BinaryParser::operator>>(uint32_t  &v)
   v = CONV_FROM_BE32(v);
 
   where += sizeof(uint32_t);
+
+  return const_cast<BinaryParser&>(*this);
 }
 
 
@@ -316,13 +353,15 @@ private:
   JESStreamer(ba::io_service &io, 
 			  FramePool &mpool,
 			  const ba::ip::tcp::socket::native_handle_type &so) : 
+	state(State::InitState),
 	strand(io), 
 	insock(io, ba::ip::tcp::v4() ,so), 
 	cancel(false),
 	mpool(mpool),
 	bootstrap( SCAST2BYTE_PTR(mpool.alloc_bootstrap()), nullptr, 0, mpool.bootstrap_size() ),
-	state(State::InitState),
-	zqueue(STREAM_ZBUFFER_SIZE)
+	zqueue(STREAM_ZBUFFER_SIZE),
+	jdec(std::make_shared<JPEGDecoder>()),
+	iparam(std::make_shared<DecImgParams>())
   {
 	start_reading();
   }
@@ -331,14 +370,16 @@ private:
 			  ba::io_service &io, 
 			  FramePool &mpool,
 			  const ba::ip::tcp::socket::native_handle_type &so) : 
+	state(State::InitState),
 	camera(parent),
 	strand(io), 
 	insock(io, ba::ip::tcp::v4() ,so), 
 	cancel(false),
 	mpool(mpool),
 	bootstrap( SCAST2BYTE_PTR(mpool.alloc_bootstrap()), nullptr, 0, mpool.bootstrap_size() ),
-	state(State::InitState),
-	zqueue(STREAM_ZBUFFER_SIZE)
+	zqueue(STREAM_ZBUFFER_SIZE),
+	jdec(std::make_shared<JPEGDecoder>()),
+	iparam(std::make_shared<DecImgParams>())
   {
 	start_reading();
   }
@@ -346,7 +387,12 @@ private:
 public:
 
   ~JESStreamer() {
+
+	if (std::get<field(WBField::SlabInfo)>(working_buffer).second != nullptr)
+	  release_wrk_buff();
+
 	mpool.release_bootstrap(std::get<field(BBufferField::RawData)>(bootstrap));
+
 	if (!cancel)
 	  insock.close();
   }
@@ -371,10 +417,15 @@ public:
 private:
   void reading_handler_stub(const boost::system::error_code& er, size_t size );
 
-  uint8_t     *bootstrap_wrk_offset();
-  State        setInitState();
+  uint8_t    *bootstrap_wrk_offset();
+  State       setInitState();
 
   uint8_t *const   bootstrap_begin() const;
+
+  uint8_t    *working_buff_offset()  const;
+  size_t      left_in_working_buff() const;
+  uint8_t *const  working_buff_begin() const;
+  size_t      working_buff_size() const;
 
   size_t      reset_bootstrap();
   size_t      update_bootstrap(uint8_t *p);
@@ -393,6 +444,11 @@ private:
   void inc_bootstrap_written(const size_t size);
  
   void set_state(State);
+
+
+  void init_wrk_buff(const size_t size);
+  void release_wrk_buff();
+
 private:
   CameraWeakRef camera;
 
@@ -409,8 +465,14 @@ private:
   FramePool &mpool;
   BootstrapBuffer bootstrap;            ///< bootstrap buffer for header of camera content. is one page size
   boost::circular_buffer<Frame> zqueue; ///< incoming frame buffer of ready for displaying images
+  std::mutex zqlock;
+
+  WrkBuffer working_buffer;            ///< incoming jpeg frame (comressed) buffer
 
   JESHdr jes_hdr;
+
+  std::shared_ptr<JPEGDecoder>    jdec;
+  std::shared_ptr<DecImgParams> iparam; 
 };
 
 namespace vid {

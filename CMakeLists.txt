@@ -4,7 +4,7 @@ project(EyeOfFly)
 
 # add_definitions( -DBOOST_ASIO_ENABLE_HANDLER_TRACKING -DDEBUG )
 
-add_executable(EyeOfFly fly.cc cam.cc dim.cc disp.cc framempool.cc streamer.cc camcon)
+add_executable(EyeOfFly fly.cc cam.cc dim.cc disp.cc framempool.cc streamer.cc jpegd.cc camcon)
 
 set(Boost_USE_STATIC_LIBS        ON)
 set(Boost_USE_MULTITHREADED      ON)
@@ -22,10 +22,11 @@ else()
   message(FATAL_ERROR "boost should be installed")
 endif()
 
-set( USE_CXX11      "-std=c++0x -Wfatal-errors"       )
-set( CMAKE_CXX_FLAGS  "-g ${CMAKE_CXX_FLAGS} ${USE_CXX11} -flto" )
+set( USE_CXX11        "-std=c++0x -Wfatal-errors"                      )
+set( CMAKE_CXX_FLAGS  "-Wall -g ${CMAKE_CXX_FLAGS} ${USE_CXX11} -flto" )
 
 #include_directories(${PROJECT_SOURCE_DIR}/../lib)
 
+target_link_libraries(EyeOfFly turbojpeg)
 target_link_libraries(EyeOfFly ${FLTK_LIBRARIES}  ${OPENGL_LIBRARIES} )
 target_link_libraries(EyeOfFly PocoNet PocoFoundation  )

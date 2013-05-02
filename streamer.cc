@@ -61,6 +61,18 @@ vid::JESStreamer::start_reading( const ba::ip::tcp::socket::native_handle_type &
   return start_reading();
 }
 
+#include <fstream>
+
+void dumpme(const char *fname, uint8_t *p, size_t size)
+{
+  std::ofstream of(fname, std::ios_base::app);
+  if (of) {
+	of.write(reinterpret_cast<char *>(p), size);
+  }
+
+  of.close();
+}
+
 void
 vid::JESStreamer::start_reading()
 {
@@ -85,12 +97,6 @@ vid::JESStreamer::reading_handler_stub(const boost::system::error_code& er,
 {
   std::cerr << "Placeholder =>  get " << size << " bytes" << std::endl;
   
-  /// @todo can we get 0 bytes?
-  if (!size) {
-	dbg("logical error: zero bytes recieved!");
-	throw vid::exception::logic_error("get zero bytes");
-  }
-
   /// @todo: error handig with posting to log
   if (er) {
 	if (er == ba::error::eof) { // ok: remote have closed connection
@@ -107,6 +113,14 @@ vid::JESStreamer::reading_handler_stub(const boost::system::error_code& er,
 	return;
   }
 
+  /// @todo can we get 0 bytes?
+  if (!size) {
+	dbg("logical error: zero bytes recieved!");
+	throw vid::exception::logic_error("get zero bytes");
+  }
+
+
+  dumpme("dump.log", bootstrap_wrk_offset(), size);
 
   ToReadInPtr wp = std::make_pair(nullptr,0);
 
@@ -138,7 +152,8 @@ vid::JESStreamer::reading_handler_stub(const boost::system::error_code& er,
 	throw vid::exception::logic_error("internal error");
   }
 
-  dbg("Reading async...");
+  dbg("Reading async " << left_in_bootstrap() << ", state => " << (unsigned) state );
+
   async_read(insock, 
 			 // ba::buffer( std::get<field(BBufferField::RawData)>(bs) +
 			 // 			 std::get<field(BBufferField::BytesWritten)>(bs),
@@ -282,7 +297,7 @@ JESStreamer::update_bootstrap(uint8_t *p)
 {
   ptrdiff_t    diff = p - std::get<field(BBufferField::RawData)>(bootstrap);
 
-  assert(diff <= std::get<field(BBufferField::Size)>(bootstrap) );
+  assert(diff <= (ptrdiff_t) std::get<field(BBufferField::Size)>(bootstrap) );
 
   // const size_t size =     std::get<field(BBufferField::Size)>(bootstrap);
 
@@ -334,13 +349,32 @@ JESStreamer::set_state(State new_state)
   state = new_state;
 }
 
+uint8_t *
+JESStreamer::working_buff_offset()  const {
+  using namespace std;
+
+  void *p = get<field(WBField::SlabInfo)>(working_buffer).second;
+
+  return static_cast<uint8_t *>(p) + 
+	get<field(WBField::Offset)>(working_buffer);
+}
+
+size_t
+JESStreamer::left_in_working_buff() const {
+  using namespace std;
+
+  return get<field(WBField::Size)>(working_buffer) - 
+	get<field(WBField::Offset)>(working_buffer);
+}
+
+
 
 JESStreamer::ToReadInPtr 
 JESStreamer::search_jpeg_mark(const size_t size) 
 {
   using namespace std;
 
-  BootstrapBuffer &bs = bootstrap;
+  //BootstrapBuffer &bs = bootstrap;
 
   assert(size);
 
@@ -454,7 +488,7 @@ JESStreamer::search_jpeg_mark(const size_t size)
 	if (state == State::ReadJESSecondMarkState && left) {
 	  // 'left' enough bytes in buffer for jes header
 
-	  // dbg("loading jes header, left => " << dec << left);
+	  dbg("loading jes header, left => " << dec << left);
 	  // dbg("byte0 => " << hex << (unsigned) buffer[-4]);
 	  // dbg("byte1 => " << hex << (unsigned) buffer[-3]);
 	  // dbg("byte2 => " << hex << (unsigned) buffer[-2]);
@@ -468,7 +502,7 @@ JESStreamer::search_jpeg_mark(const size_t size)
 	  // dbg("buffer offset working => " << (buffer - bootstrap_wrk_offset()));
 
 	  update_bootstrap(buffer);
-
+	  dbg("left in bootstrap => " << left_in_bootstrap());
 	  // dbg("buffer offset after => " <<  (buffer - bootstrap_wrk_offset()));
 
 	  return load_jes_hdr(left);
@@ -478,7 +512,8 @@ JESStreamer::search_jpeg_mark(const size_t size)
 
   // update bytes written. it shouldn't overflows, because asio::buffer interface 
   // should insure requests in async operation bounds
-  inc_bootstrap_written(size);
+  //inc_bootstrap_written(size);
+  update_bootstrap(buffer+left);
 
   size_t to_write = left_in_bootstrap();
 
@@ -502,7 +537,7 @@ JESStreamer::load_jes_hdr(const size_t size)
   //BootstrapBuffer &bs = bootstrap;
 
   uint8_t *buffer        = bootstrap_wrk_offset();
-  uint8_t * const wrkwin = buffer;
+  //uint8_t * const wrkwin = buffer;
   size_t left            = size;
 
   switch(state) {
@@ -515,7 +550,7 @@ JESStreamer::load_jes_hdr(const size_t size)
 	// all marks are checked at this point, we have a jpeg with jes;
 	// chain it to header parser
 
-	if (left >= JES_HEADER_SIZE) { // - JES_MARKS_NUM
+	if (left + JES_MARKS_NUM >= JES_HEADER_SIZE) {
 	  // start to read jes header and we have place for whole header
 
 	  set_state(State::GetJESHeaderState);
@@ -523,24 +558,39 @@ JESStreamer::load_jes_hdr(const size_t size)
 	  // current position - 4 byte marks (2 JPEG + 2 JES)
 	  set_hdr_pointer(buffer-JES_MARKS_NUM);
 
+	  left   -= JES_HEADER_SIZE - JES_MARKS_NUM;
+	  buffer += JES_HEADER_SIZE - JES_MARKS_NUM;
+
+	  update_bootstrap(buffer );
+
 	  // 'left' enough bytes in buffer for jes header
 	  return load_jpeg(left);
 
-	} else if (left_in_bootstrap() + left < JES_HEADER_SIZE + BS_BUFFER_LOW_WATERMARK) {
+	} else if (left_in_bootstrap() < JES_HEADER_SIZE + BS_BUFFER_LOW_WATERMARK) {
 
 	  // no place in bootstrap to get whole header, move part to
 	  // the start of bootstrap and init header pointer
-	  size_t to_write = move_to_begin_bootstrap(buffer, left);
+	  size_t to_write = move_to_begin_bootstrap(buffer-JES_MARKS_NUM, left+JES_MARKS_NUM);
 	  set_hdr_pointer(  bootstrap_begin() );
 
-	  return make_pair( bootstrap_wrk_offset(), to_write);
+	  dbg("to_write => " << to_write );
+	  set_state(State::ReadJESHeaderState);
+	  return make_pair( bootstrap_wrk_offset(), to_write );
 	} else {
 	  // we have enough place to read in, 
 	  // but haven't enough bytes yet,
 	  // just got to next read iteration in this state
 
+	  //dbg("left_in_bootstrap (before update) => " << left_in_bootstrap() );
+
+	  // current position - 4 byte marks (2 JPEG + 2 JES)
+	  set_hdr_pointer(buffer-JES_MARKS_NUM);
+
 	  update_bootstrap(buffer + left);
 
+	  dbg("left_in_bootstrap => " << left_in_bootstrap() << " left => " << left );
+
+	  set_state(State::ReadJESHeaderState);
 	  return make_pair(bootstrap_wrk_offset(),
 					   left_in_bootstrap() );
 	}
@@ -568,6 +618,9 @@ JESStreamer::load_jes_hdr(const size_t size)
 	}
 
 	break;
+  default:
+	throw exception::logic_error("Wrong state!");
+	break;
   };
 }
 
@@ -581,27 +634,124 @@ JESStreamer::load_jpeg(const size_t size)
   size_t left = size;
 
   // at this point we have full header (and pointer to it) 
+
   switch(state) {
   case State::GetJESHeaderState:
 	parse_jes_hdr();
 	// now we have incoming frame size we need to alloc it and set window pointers to it
 	// and chain loading of data
 
-	// for now start over
-	reset_bootstrap();
-	state = setInitState();
-	return make_pair(bootstrap_wrk_offset(),
-					 left_in_bootstrap());
-	break;
+	try {
+	  // 
+	  // 1. We should have the header size in jes_hdr.size field
+	  //    let request working buffer 
+	  init_wrk_buff(jes_hdr.size);
+	 	  
+	  //
+	  // 2. Copy header and data left in bootstrap to allocated buffer
+	  //
+
+	  dbg( "preparing copy");
+
+	  Logger &d = Logger::get("dbg-connect");
+	  d.dump("JES header (+16 bytes):", 
+			 get_hdr_pointer(), 
+			 JES_HEADER_SIZE + 16, 
+			 Message::PRIO_ERROR);
+
+
+	  // copy jes header to working buffer 
+	  memcpy(get<field(WBField::SlabInfo)>(working_buffer).second,
+			 get_hdr_pointer(),
+			 JES_HEADER_SIZE );
+
+	  // copy left bytes to working buffer
+	  memcpy(static_cast<uint8_t *>(get<field(WBField::SlabInfo)>(working_buffer).second) + 
+			 JES_HEADER_SIZE,
+			 bootstrap_wrk_offset(),
+			 left );	  
+
+	  dbg( "copy existing data done");
+
+	  get<field(WBField::Offset)>(working_buffer) = JES_HEADER_SIZE + left;
+
+	  set_state(State::ReadJPEGFrameState);
+
+	  left = 0;
+
+	} catch(exception::out_of_range_error &e) {
+	  Logger &d = Logger::get("dbg-connect");
+	  d.dump("Errornous? JES header:", 
+			 get_hdr_pointer(), 
+			 JES_HEADER_SIZE, 
+			 Message::PRIO_ERROR);
+	}
+
+	// break;
   default:
   case State::ReadJPEGFrameState:
 	//
 	// Continue loading of data until all data read
 	// 
+	if (left)
+	  get<field(WBField::Offset)>(working_buffer) += left;
 
-	//
-	// Get all frame 
-	//
+	
+	if (get<field(WBField::Offset)>(working_buffer) < 
+		get<field(WBField::Size)>(working_buffer)) { 
+	  // need to load more data in working buffer
+
+	  dbg("need some data for JPEG");
+	  return make_pair(working_buff_offset(),
+					   left_in_working_buff() );
+
+	} else if (get<field(WBField::Offset)>(working_buffer) ==
+			   get<field(WBField::Size)>(working_buffer)) {
+	  // get whole JPEG, parse it
+	  dbg("get jpeg!!!");
+
+	  // Logger &d = Logger::get("dbg-connect");
+	  // d.dump("Here is your JPEG. Is it ok?", 
+	  // 		 working_buff_begin(),
+	  // 		 working_buff_size(),
+	  // 		 Message::PRIO_ERROR);
+
+	  // dumpme("test2.jpg",
+	  // 		 working_buff_begin(),
+	  // 		 working_buff_size());
+
+	  //	  exit(1310);
+	  
+	  int r = jdec->bind(working_buff_begin(), 
+				 working_buff_size(),
+				 *iparam);
+
+	  dbg("JPEG params [" << r << "]: w => " << iparam->width << ", h => " << iparam->height << ", cols " << iparam->out_colors);
+
+	  // count the size needed for image 
+	  // and allocate memory chunk
+	  ImageType type = itype(*iparam);
+	  if (type != ImageType::Undefined) {
+	    uint8_t *p = static_cast<uint8_t *>(mpool.alloc_predef(type));
+		dbg("get fresh frame ponter" << p);
+
+		jdec->decompress(p);
+
+		{
+		  lock_guard<mutex> lock(zqlock);
+		  zqueue.push_back( make_tuple( FrameRawSPtr(p, FrameDeleter(mpool, type) ), 
+										get_size(type), type) );
+		}
+
+		//mpool.release_predef(type,p);
+	  } else {
+		jdec->finish();
+	  }
+		
+	  release_wrk_buff();
+	} else { // error, we cant have more bytes in buffer then requested
+	  throw exception::out_of_range_error("get wrong number of bytes in working buffer");
+	}
 	
 	//
 	// Decompress image
@@ -623,3 +773,37 @@ JESStreamer::load_jpeg(const size_t size)
   };
 }
 
+void 
+JESStreamer::init_wrk_buff(const size_t size)
+{
+  using namespace std;
+
+  if (get<field(WBField::SlabInfo)>(working_buffer).second) {
+	release_wrk_buff();
+  }
+  
+  std::get<field(WBField::SlabInfo)>(working_buffer) =
+	mpool.alloc_wrk(size);  
+  std::get<field(WBField::Size    )>(working_buffer) = size;
+
+}
+  
+void 
+JESStreamer::release_wrk_buff()
+{
+  mpool.release_wrk(std::get<field(WBField::SlabInfo)>(working_buffer));
+
+  std::get<field(WBField::SlabInfo)>(working_buffer).second = nullptr;
+}
+
+uint8_t *const  
+JESStreamer::working_buff_begin() const 
+{
+  return static_cast<uint8_t *>(std::get<field(WBField::SlabInfo)>(working_buffer).second);
+}
+
+size_t      
+JESStreamer::working_buff_size() const 
+{
+  return std::get<field(WBField::Size)>(working_buffer);
+}

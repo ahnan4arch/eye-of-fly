@@ -31,7 +31,8 @@ namespace vid {
 	// 320x240
 	SIZE320x240c,
 	SIZE320x240g,
-
+   	
+    Undefined,
 	IMAGE_TYPES_NUM
   };
 
@@ -48,6 +49,9 @@ namespace vid {
   };
   
   template<size_t W, size_t H, BytesPerPixel S, ColorOrder C=ColorOrder::G> struct Dim;
+  class DecImgParams;
+
+  ImageType itype(const DecImgParams &);
 
   /// Help functions
   const size_t   get_size(ImageType type);
@@ -87,6 +91,18 @@ struct vid::Dim {
   }
 
 };
+
+///
+/// @struct DecImgParams
+/// 
+/// @brief used in incoming image decompression
+///
+struct vid::DecImgParams {
+  unsigned width;
+  unsigned height;
+  unsigned out_colors;  
+};
+
 
 namespace vid {
   ///< Some predifined common image demensions

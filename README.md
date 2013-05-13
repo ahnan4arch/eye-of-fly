@@ -9,6 +9,7 @@ Building
 ========
 
 You need following tools/libs:
+
 1. Cmake v2.8
 2. FLTK v1.3.*
 3. OpengGL. spec v > 2
@@ -23,20 +24,20 @@ Note: other versions of software may work.
 Go to dir you want to create copy of project, than
 extract application sources from repository
 
-$ git clone  https://github.com/karitra/eye-of-fly.git eye
+	$ git clone  https://github.com/karitra/eye-of-fly.git eye
 
 Make build directory:
 
-$ mkdir build
-$ cd build
+	 $ mkdir build
+	 $ cd build
 
 Run cmake:
 
-$ BOOST_ROOT=$PATH_TO_BOOST_DIST cmake $PATH_TO_SRC
+	$ BOOST_ROOT=$PATH_TO_BOOST_DIST cmake $PATH_TO_SRC
 
 where $PATH_TO_BOOST_DIST is a path where cmake can find boost headers (usually root of boost/* path) and libraries. $PATH_TO_SRC is a path to freshly extracted sources, usually you can just type: 
 
-$ cmake ..
+	  $ cmake ..
 
 If cmake generates makefile, run:
 
@@ -60,12 +61,12 @@ MinGW with gcc >= v4.6 highly recommended
 May work, but there aren't any reason to port app to other systems,
 as they are not of any interest of customer.
 
-Running
+Usage
 =======
 
 On Linux run:
 
-$ ./EyeOfFly <ip address of camera>
+   $ ./EyeOfFly <ip address of camera>
 
 TODO
 ====

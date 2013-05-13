@@ -55,6 +55,10 @@ namespace vid {
 
   /// Help functions
   const size_t   get_size(ImageType type);
+  
+  const unsigned get_width(ImageType &);
+  const unsigned get_height(ImageType &);
+
   const size_t   get_size(unsigned type);
 
   unsigned       get_fps(Fps fps);
@@ -118,6 +122,8 @@ namespace vid {
   };
 
   typedef std::tuple<ImageType, Fps> VideoMode;
+
+  const vid::DecImgParams get_geom(ImageType &t);
 }
 
 

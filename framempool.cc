@@ -113,14 +113,14 @@ FramePool::bootstrap_size()  const
 void *
 FramePool::alloc_predef(ImageType type)
 {
-  dbg("Allocating prefefined image buffer for type " << CAST2UINT(type) );
+  //dbg("Allocating prefefined image buffer for type " << CAST2UINT(type) );
   return predefined[CAST2UINT(type)]->get();
 }
 
 void   
 FramePool::release_predef(ImageType type, void *ptr)
 {
-  dbg("Deallocating of type " << CAST2UINT(type) << " ptr => " << ptr );
+  //dbg("Deallocating of type " << CAST2UINT(type) << " ptr => " << ptr );
   predefined[CAST2UINT(type)]->release(ptr);
 }
 
@@ -138,8 +138,8 @@ FramePool::alloc_wrk(size_t size)
 void
 FramePool::release_wrk(const WorkingSlab &victim)
 {
-  Logger &d = Logger::get("dbg-connect");
-  poco_warning_f1(d, "release at pool with id => %u", victim.first);
+  // Logger &d = Logger::get("dbg-connect");
+  // poco_warning_f1(d, "release at pool with id => %u", victim.first);
   
   wrk_pools[victim.first]->release(victim.second);
 }
@@ -173,8 +173,8 @@ FramePool::wrk_pool_idx(const size_t size) const
 
   unsigned long pages = pages_num(size);
 
-  Logger &d = Logger::get("dbg-connect");
-  poco_warning_f1(d, " requesting page size => %lu", pages );
+  // Logger &d = Logger::get("dbg-connect");
+  // poco_warning_f1(d, " requesting page size => %lu", pages );
 
   WorkingPoolsVec::const_iterator it = find_if( begin(wrk_pools),
 												end(wrk_pools), 
@@ -189,7 +189,7 @@ FramePool::wrk_pool_idx(const size_t size) const
   }
   
   
-  poco_warning_f2(d, " select index %lu, wrk. buff pg_num => %u", (unsigned long) distance( begin(wrk_pools), it), (*it)->pg_number() ) ;
+  //poco_warning_f2(d, " select index %lu, wrk. buff pg_num => %u", (unsigned long) distance( begin(wrk_pools), it), (*it)->pg_number() ) ;
   
   return distance( begin(wrk_pools), it);
 }

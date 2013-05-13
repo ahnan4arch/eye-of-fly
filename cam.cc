@@ -9,6 +9,7 @@
 #include "cam.h"
 #include "camcon.h"
 #include "framempool.h"
+#include "disp.h"
 
 
 using Poco::ConsoleChannel;
@@ -22,14 +23,8 @@ const std::string vid::Camera::get_cmd_args_format = "none";
 
 const std::string vid::NVCamera::get_cmd_args_format = 
   "/cgi-bin/fwstream.cgi?"												\
-  "FwModId=0&AppKey=0x0450f000&PortId=%d&PauseTime=5&FwCgiVer=0x0001";
+  "FwModId=0&AppKey=0x0450f000&PortId=%d&PauseTime=0&FwCgiVer=0x0001";
 
-
-// std::string 
-// Camera::prepare_cmd(const VideoMode &, const std::string &name, int id) 
-// {
-//   return "";
-// }
 
 std::pair<bool,StreamerSPtr>
 Camera::stream(const std::string &name) 
@@ -44,7 +39,7 @@ Camera::stream(const std::string &name)
 }
 
 
-void 
+StreamerSPtr 
 Camera::add_streamer(vid::Dispatcher &d, const std::string &name, const VideoMode &vmode, int id)
 {
 
@@ -99,6 +94,12 @@ Camera::add_streamer(vid::Dispatcher &d, const std::string &name, const VideoMod
   }
 
   streams.insert( std::make_pair(name, s) );
+  
+  //
+  // Finally add camera record to dispatcher
+  //
+  d.add_camera(this->idname, shared_from_this() );
+  return s;
 }
 
 

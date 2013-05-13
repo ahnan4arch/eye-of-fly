@@ -1,9 +1,12 @@
 #include <fstream>
+#include <iostream>
 #include <cassert>
 
 #include "jpegd.h"
 #include "exception.h"
 
+
+#define dbg(m) std::cerr << m << std::endl;
 
 using namespace std;
 using namespace vid;
@@ -47,21 +50,40 @@ JPEGDecoder::bind(uint8_t *src, size_t size, DecImgParams &r)
   return rc;
 }
 
+void
+JPEGDecoder::init_cache(uint8_t *dst)
+{
+  for(register unsigned i = 0; i < CACHE_SIZE; ++i) {
+	cache[i] = dst + bytes_in_row * (jinfo->output_scanline + i);
+  }
+}
+
 void 
 JPEGDecoder::decompress(uint8_t *dst)
 {
   if (!start_set)
 	throw exception::init_error("jpeg_start_decompress (in bind) must be called before decompressing");
 
+  //dbg("starting jpeg decompressing...");
+  bytes_in_row = jinfo->output_width * jinfo->output_components;
+
+  //uint8_t *where[1];
   while(jinfo->output_scanline < jinfo->output_height) {
-	register uint8_t *where = dst + jinfo->output_width * jinfo->output_scanline;
+	init_cache(dst);
+  	//where[0] = {dst + bytes_in_row * (jinfo->output_scanline ) } ;
+    //cache[0] = dst + jinfo->output_width * jinfo->output_components;
 	jpeg_read_scanlines(jinfo.get(), 
-						&where,
-						jinfo->output_height - jinfo->output_scanline);
+						//where,
+						//1 );
+						cache,
+						CACHE_SIZE );
+
+						//jinfo->output_height - jinfo->output_scanline);
   }
 
   jpeg_finish_decompress(jinfo.get());
   start_set = false;
+  //dbg("done jpeg decompressing...");
 }
 
 void

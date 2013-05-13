@@ -55,3 +55,19 @@ Dispatcher::wait()
 			[&] (ThreadSPtr t) { t->join(); } );  
 	
 }
+
+
+void 
+Dispatcher::add_camera(const std::string &name, CameraSPtr cam)
+{
+  CamerasMap::iterator f = cams.find(name);
+  if (f == cams.end() || f->second != cam) {
+	cams.insert(make_pair(name,cam));
+  }
+}
+
+void 
+Dispatcher::bind(IView::pointer view, const std::string &cname, const std::string &sname)
+{
+  // TODO!
+}

@@ -68,5 +68,58 @@ vid::itype(const DecImgParams &par)
 	break;
   default:
 	return ImageType::Undefined;
-  };
+  }
+}
+
+const unsigned vid::get_width(ImageType &t)
+{
+  switch(t) {
+  case ImageType::SIZE640x480g:
+  case ImageType::SIZE640x480c:
+	return 640;
+	break;
+  case ImageType::SIZE320x240g:
+  case ImageType::SIZE320x240c:
+	return 320;
+	break;
+  default:
+	return 0;
+  }
+}
+
+const unsigned vid::get_height(ImageType &t)
+{
+  switch(t) {
+  case ImageType::SIZE640x480g:
+  case ImageType::SIZE640x480c:
+	return 480;
+	break;
+  case ImageType::SIZE320x240g:
+  case ImageType::SIZE320x240c:
+	return 240;
+	break;
+  default:
+	return 0;
+  } 
+}
+
+const vid::DecImgParams vid::get_geom(ImageType &t) 
+{
+  switch(t) {
+  case ImageType::SIZE320x240g:
+	return {320, 240, 1};
+	break;
+  case ImageType::SIZE320x240c:
+	return {320, 240, 3};
+	break;
+  case ImageType::SIZE640x480c:
+	return {640, 480, 3};
+	break;
+  case ImageType::SIZE640x480g:
+	return {640, 480, 1};
+	break;
+  default:
+	return {0, 0, 0};
+	break;
+  }
 }

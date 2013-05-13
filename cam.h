@@ -23,12 +23,13 @@ namespace vid {
 
 namespace vid {
   namespace ba = boost::asio;
+  class Dispatcher;
 
   //  typedef std::list<Frame>          FramesList;
   typedef std::map<std::string, StreamerSPtr> StreamsMap;
 }
 
-#include "disp.h"
+//#include "disp.h"
 
 
 ///
@@ -52,7 +53,7 @@ protected:
 
 public:
 
-  void add_streamer(vid::Dispatcher &, 
+  StreamerSPtr add_streamer(vid::Dispatcher &, 
 					const std::string &name, 
 					const VideoMode &vmode, 
 					int id=0);
@@ -62,6 +63,7 @@ public:
 
   /// Should check for pointer validity
   std::pair<bool,StreamerSPtr> stream(const std::string &name);
+  //StreamerSPtr Camera::stream(const std::string &name);
 
   virtual std::string get_url() const {
   	return url;

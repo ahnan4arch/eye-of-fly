@@ -7,6 +7,7 @@
 #define _STREAMER_INC_
 
 #include <atomic>
+#include <chrono>
 #include <memory>
 #include <tuple>
 #include <thread>
@@ -59,6 +60,8 @@ namespace vid {
 					 size_t,         ///< Size of processed frame
 					 ImageType
 					 > Frame;
+
+  typedef std::pair<bool, Frame> FrameWithFlag;
 
   class FrameDeleter;
 
@@ -279,6 +282,7 @@ struct vid::StreamerStat {
 
 class vid::Streamer {
 public:
+
   virtual void start_reading() = 0;
   virtual void start_reading( const ba::ip::tcp::socket::native_handle_type &so ) = 0;
 
@@ -293,6 +297,13 @@ public:
   
   typedef std::shared_ptr<void> ISockSPtr;
   virtual void store_sock_holder(ISockSPtr) = 0;
+
+  // virtual const Frame pop_frame()   = 0;
+  // virtual size_t zqueue_len() const = 0;
+
+  virtual const FrameWithFlag   pop_frame()       = 0;
+  virtual                       size_t zqueue_len() const = 0;
+
 
   virtual ~Streamer() {}
 };
@@ -393,8 +404,15 @@ public:
 
 	mpool.release_bootstrap(std::get<field(BBufferField::RawData)>(bootstrap));
 
+	///
+	/// @todo where we should close socket. It'll be closed also inside connection 
+	/// class (in StreamSocket).
+	///
 	if (!cancel)
 	  insock.close();
+
+	std::lock_guard<std::mutex> lock(zqlock);
+	zqueue.clear();
   }
 
 public:
@@ -414,7 +432,11 @@ public:
 
   virtual void store_sock_holder(ISockSPtr);
 
+  virtual const std::pair<bool,Frame>   pop_frame();
+  virtual                       size_t zqueue_len() const;
+
 private:
+
   void reading_handler_stub(const boost::system::error_code& er, size_t size );
 
   uint8_t    *bootstrap_wrk_offset();
@@ -465,7 +487,7 @@ private:
   FramePool &mpool;
   BootstrapBuffer bootstrap;            ///< bootstrap buffer for header of camera content. is one page size
   boost::circular_buffer<Frame> zqueue; ///< incoming frame buffer of ready for displaying images
-  std::mutex zqlock;
+  mutable std::mutex zqlock;
 
   WrkBuffer working_buffer;            ///< incoming jpeg frame (comressed) buffer
 
@@ -473,6 +495,11 @@ private:
 
   std::shared_ptr<JPEGDecoder>    jdec;
   std::shared_ptr<DecImgParams> iparam; 
+
+private: // benchmark time stamps
+
+  std::chrono::time_point<std::chrono::high_resolution_clock> net_t1;
+
 };
 
 namespace vid {

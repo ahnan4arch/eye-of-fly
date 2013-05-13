@@ -1,5 +1,5 @@
+#include <iostream>
 #include <memory>
-#include <cstdlib>
 
 #include <Poco/Logger.h>
 #include <Poco/LogStream.h>
@@ -8,6 +8,7 @@
 #include <boost/exception/diagnostic_information.hpp>
 
 #include "disp.h"
+#include "view.h"
 
 
 using Poco::Logger;
@@ -17,9 +18,17 @@ using Poco::ConsoleChannel;
 using namespace std;
 using namespace vid;
 
-class Runtime {
+namespace vid {
+  class Runtime;
+}
+
+class vid::Runtime {
 public:
-  static int run(const std::string &url) {
+
+  static int run(int argc, char *argv[]) {
+
+	std::string url( (argc >= 2) ? argv[1] : "192.168.13.14");
+
 	Dispatcher disp;
 	CameraSPtr cam1 = NVCamera::make(url, "test1"); 
 
@@ -33,9 +42,16 @@ public:
 	}
 
 	disp.run();
+	LogStream ls(Logger::get("dbg-connect"));
+	ls << "Getting data..."  << endl;
+
+	//	StreamerSPtr stream;
+	int gui_ret = MainView::run_test( make_shared<StubFrameReceiver>(), cam1->stream("ch1").second , argc, argv);
+	ls << "Gui running..."  << endl;
+	disp.service().stop();
 	disp.wait();
 
-	return EXIT_SUCCESS;
+	return gui_ret;
   }
   
   static int usage() {
@@ -60,7 +76,7 @@ main(int argc, char *argv[] )
   if (argc < 2) {
 	return Runtime::usage();
   }
-  Runtime::init();
 
-  return Runtime::run(argv[1]);
+  Runtime::init();
+  return Runtime::run( argc, argv);
 }

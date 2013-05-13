@@ -112,7 +112,10 @@ vid::JESStreamer::reading_handler_stub(const boost::system::error_code& er,
 	  dbg("reading cancel: " << er);
 	}
 
-	dbg("unknown error");
+	//dbg("unknown error");
+	insock.close();
+	//insock.stop();
+	//insock.cancel();
 	return;
   }
 
@@ -735,7 +738,7 @@ JESStreamer::load_jpeg(const size_t size)
 	  auto dt_net = chrono::duration_cast<chrono::microseconds>(net_t2 - net_t1).count();
 	  StreamStat::instance()->update_jpeg_retrieval_time(dt_net);
 
-	  dbg(" Retrieving of frame takes " << dt_net << " us");
+	  // dbg(" Retrieving of frame takes " << dt_net << " us");
 
 
 	  StreamStat::instance()->update_jpeg_size(jes_hdr.size);
@@ -767,7 +770,7 @@ JESStreamer::load_jpeg(const size_t size)
 		
 		StreamStat::instance()->update_jpeg_decode_time(dt);
 
-		dbg(" Decompression takes " << dt << " us");
+		// dbg(" Decompression takes " << dt << " us");
 
 		//
 		// Store it in circular buffer (possibly deleting old one)

@@ -23,6 +23,11 @@ namespace {
   class ViewGenerator;
 }
 
+namespace { 
+  const GLfloat col_fwhite[] = {1.f,1.f,1.f,1.f};
+  const GLfloat col_fblack[] = {0.f,0.f,0.f,1.f};
+}
+
 std::ostream &vid::operator<<(std::ostream &o, const IView &iv)
 {
   static const char sep = ',';
@@ -49,6 +54,7 @@ CamViewStub::draw()
 
   //dbg( "Drawing rec (" << x() << LSP << y() << LSP << w() << LSP << h()  << ')');
 }
+
 
 void 
 CamViewTest::draw_tex()
@@ -97,10 +103,9 @@ CamViewTest::draw_tex()
 #endif
 
 	glEnable(GL_TEXTURE_2D);
-	glColor3f(1.,1.,1.);
+	glColor3fv(col_fwhite);
 	glInterleavedArrays( GL_T2F_V3F, 0, view.get() );
 	glDrawArrays( GL_QUADS, 0, 4 );  
-	//glColor3f(1.,1.,1.);
 	glDisable(GL_TEXTURE_2D);
   }
 }
@@ -309,9 +314,9 @@ MainView::run_test( IFrameReceiver::pointer rec, StreamerSPtr stream, int argc, 
  
   w->show(argc, argv);
   
-  while(Fl::wait(0) >= 0) {
+  while(Fl::check() > 0) {
   	rec->set_frame(stream);
-	//	dbg("Redraw event...");
+	//dbg("Redraw event...");
   	w->redraw();
   }
 
@@ -431,7 +436,7 @@ StatPanel::draw()
   os << "Frame retrieval @ "
 	 << std::setprecision(2) << std::fixed 
 	 << (sp->avg_net() / 1000.)
-	 << " ms (per frame)" 
+	 << " ms" 
 	 << std::endl ;
 	
   gl_draw(os.str().c_str(), static_cast<int>(x() + 10U), static_cast<int>(y() + 10U));

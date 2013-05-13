@@ -30,6 +30,8 @@ public:
 	std::string url( (argc >= 2) ? argv[1] : "192.168.13.14");
 
 	Dispatcher disp;
+	//boost::asio::io_service::work work(disp.service());
+
 	CameraSPtr cam1 = NVCamera::make(url, "test1"); 
 
 	try {
@@ -48,7 +50,10 @@ public:
 	//	StreamerSPtr stream;
 	int gui_ret = MainView::run_test( make_shared<StubFrameReceiver>(), cam1->stream("ch1").second , argc, argv);
 	ls << "Gui running..."  << endl;
-	disp.service().stop();
+
+	cam1->del_streamer("ch1");
+
+	//disp.service().stop();
 	disp.wait();
 
 	return gui_ret;

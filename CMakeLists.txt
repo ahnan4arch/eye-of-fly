@@ -14,7 +14,7 @@ set(Boost_NO_SYSTEM_PATH         ON)
 set(FLTK_SKIP_FORMS  ON)
 set(FLTK_SKIP_IMAGES ON)
 
-find_package(FLTK                          REQUIRED FLTK_SKIP_FORMS FLTK_SKIP_IMAGES)
+find_package(FLTK                          REQUIRED)
 find_package(OpenGL                        REQUIRED)
 find_package(Boost  1.53 COMPONENTS system REQUIRED)
 
@@ -26,10 +26,10 @@ else()
   message(FATAL_ERROR "boost should be installed")
 endif()
 
-set( USE_CXX11        "-std=c++0x -Wfatal-errors"                      )
-#set( CMAKE_CXX_FLAGS  "-Wall -g ${CMAKE_CXX_FLAGS} ${USE_CXX11} -flto" )
+set( USE_CXX11        "-std=c++0x"                      )
+set( CMAKE_CXX_FLAGS  "-Wfatal-errors -Wall -O3 ${CMAKE_CXX_FLAGS} ${USE_CXX11} -flto" )
 #set( CMAKE_CXX_FLAGS  "-Wall -g ${CMAKE_CXX_FLAGS} ${USE_CXX11}" )
-set( CMAKE_CXX_FLAGS  "-Wall -O3 ${CMAKE_CXX_FLAGS} ${USE_CXX11}" )
+#set( CMAKE_CXX_FLAGS  "-Wall -O3 ${CMAKE_CXX_FLAGS} ${USE_CXX11}" )
 
 #include_directories(${PROJECT_SOURCE_DIR}/../lib)
 #message("Libs: ${FLTK_LIBRARIES}  ${OPENGL_LIBRARIES}")

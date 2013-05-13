@@ -110,7 +110,9 @@ Camera::del_streamer(const std::string &name)
   if (it != streams.end()) {
 	it->second->close();
 	streams.erase(it);
-  } // else: do nothing, we don't have this member
+  } 
+  // else: do nothing, we don't have this member
+  // may be throw an exception?
 }
 
 bool operator<(const vid::CameraSPtr &lhr, const vid::CameraSPtr &rhr) 

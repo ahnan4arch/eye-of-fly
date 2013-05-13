@@ -44,15 +44,28 @@ $ make
 
 If cmake fail, report a bug ;)
 
+If make succeed, you should have EyeOfFly binary in build directory
+It possible to see some warings
+
+
 ### Windows
 
 Should work, as all libraries and tools are crossplatform, but
-have never tried build process on Windows.
+have never tried build process on Windows. 
+
+MinGW with gcc >= v4.6 highly recommended
 
 ### Other *NIXes
 
 May work, but there aren't any reason to port app to other systems,
 as they are not of any interest of customer.
+
+Running
+=======
+
+On Linux run:
+
+$ ./EyeOfFly <ip address of camera>
 
 TODO
 ====
